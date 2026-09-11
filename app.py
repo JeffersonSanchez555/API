@@ -518,6 +518,55 @@ def eliminar_curso(id):
     conec.close()
     return {"mensaje": "Curso eliminado con éxito", "id": id}, 200
 
+#Hoja de vida finish him
+
+@app.route("/api/hojas-vida/<int:id_hv>/completa", methods=["GET"])
+def obtener_hoja_vida_completa(id_hv):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+
+    # 1. Datos personales
+    cursor.execute("SELECT * FROM hojadvida WHERE id = %s", (id_hv,))
+    dato_hv = cursor.fetchone()
+    if not dato_hv:
+        cursor.close()
+        conec.close()
+        return {"mensaje": "Hoja de vida no encontrada"}, 404
+
+    cols_hv = [col[0] for col in cursor.description]
+    datos_personales = dict(zip(cols_hv, dato_hv))
+
+    # 2. Estudios
+    cursor.execute("SELECT * FROM estudios WHERE id_hoja_vida = %s", (id_hv,))
+    cols_estudios = [col[0] for col in cursor.description]
+    estudios = [dict(zip(cols_estudios, fila)) for fila in cursor.fetchall()]
+
+    # 3. Cursos
+    cursor.execute("SELECT * FROM cursos WHERE id_hoja_vida = %s", (id_hv,))
+    cols_cursos = [col[0] for col in cursor.description]
+    cursos = [dict(zip(cols_cursos, fila)) for fila in cursor.fetchall()]
+
+    # 4. Experiencias y sus Habilidades
+    cursor.execute("SELECT * FROM experiencias WHERE id_hoja_vida = %s", (id_hv,))
+    cols_exp = [col[0] for col in cursor.description]
+    experiencias = [dict(zip(cols_exp, fila)) for fila in cursor.fetchall()]
+
+    for exp in experiencias:
+        cursor.execute("SELECT * FROM habilidades WHERE id_experiencia = %s", (exp["id"],))
+        cols_hab = [col[0] for col in cursor.description]
+        exp["habilidades"] = [dict(zip(cols_hab, fila)) for fila in cursor.fetchall()]
+
+    cursor.close()
+    conec.close()
+
+    return {
+        "datos_personales": datos_personales,
+        "informacion_academica": estudios,
+        "cursos": cursos,
+        "experiencia_laboral": experiencias
+    }, 200
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
