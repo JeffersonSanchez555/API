@@ -356,5 +356,75 @@ def eliminar_experiencia(id):
     return {"mensaje": "Experiencia eliminada con éxito", "id": id}, 200
 
 
+# Consultar habilidades 
+@app.route("/api/experiencias/<int:id_exp>/habilidades", methods=["GET"])
+def obtener_habilidades_exp(id_exp):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+
+    sql = "SELECT * FROM habilidades WHERE id_experiencia = %s"
+    cursor.execute(sql, (id_exp,))
+    datos = cursor.fetchall()
+
+    columnas = [col[0] for col in cursor.description]
+    habilidades = [dict(zip(columnas, fila)) for fila in datos]
+
+    cursor.close()
+    conec.close()
+    return {"habilidades": habilidades}, 200
+
+
+# Registrar habilidad
+@app.route("/api/experiencias/<int:id_exp>/habilidades", methods=["POST"])
+def registrar_habilidad(id_exp):
+    conec = conectar_bd()
+    cursor = conec.cursor()
+    datos = request.json
+
+    sql = "INSERT INTO habilidades (habilidad, nivel, id_experiencia) VALUES (%s, %s, %s)"
+    valores = (datos["habilidad"], datos.get("nivel"), id_exp)
+
+    cursor.execute(sql, valores)
+    conec.commit()
+    id_generado = cursor.lastrowid
+
+    cursor.close()
+    conec.close()
+    return {"mensaje": "Habilidad registrada con éxito", "id": id_generado}, 201
+
+
+# Actualizar habilidad
+@app.route("/api/habilidades/<int:id>", methods=["PUT"])
+def actualizar_habilidad(id):
+    conec = conectar_bd()
+    cursor = conec.cursor()
+    datos = request.json
+
+    sql = "UPDATE habilidades SET habilidad=%s, nivel=%s WHERE id=%s"
+    valores = (datos["habilidad"], datos.get("nivel"), id)
+
+    cursor.execute(sql, valores)
+    conec.commit()
+
+    cursor.close()
+    conec.close()
+    return {"mensaje": "Habilidad actualizada con éxito", "id": id}, 200
+
+
+# Eliminar habilidad
+@app.route("/api/habilidades/<int:id>", methods=["DELETE"])
+def eliminar_habilidad(id):
+    conec = conectar_bd()
+    cursor = conec.cursor()
+
+    sql = "DELETE FROM habilidades WHERE id = %s"
+    cursor.execute(sql, (id,))
+    conec.commit()
+
+    cursor.close()
+    conec.close()
+    return {"mensaje": "Habilidad eliminada con éxito", "id": id}, 200
+
+
 if __name__ == "__main__":
     app.run(debug=True)
