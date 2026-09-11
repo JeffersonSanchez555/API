@@ -426,5 +426,98 @@ def eliminar_habilidad(id):
     return {"mensaje": "Habilidad eliminada con éxito", "id": id}, 200
 
 
+# Consultar cursos 
+@app.route("/api/hojas-vida/<int:id_hv>/cursos", methods=["GET"])
+def obtener_cursos_hv(id_hv):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+
+    sql = "SELECT * FROM cursos WHERE id_hoja_vida = %s"
+    cursor.execute(sql, (id_hv,))
+    datos = cursor.fetchall()
+
+    columnas = [col[0] for col in cursor.description]
+    cursos = [dict(zip(columnas, fila)) for fila in datos]
+
+    cursor.close()
+    conec.close()
+    return {"cursos": cursos}, 200
+
+
+# Registrar un curso
+@app.route("/api/hojas-vida/<int:id_hv>/cursos", methods=["POST"])
+def registrar_curso(id_hv):
+    conec = conectar_bd()
+    cursor = conec.cursor()
+    datos = request.json
+
+    sql = "INSERT INTO cursos (nombre, institucion, duracion_horas, id_hoja_vida) VALUES (%s, %s, %s, %s)"
+    valores = (datos["nombre"], datos["institucion"], datos.get("duracion_horas"), id_hv)
+
+    cursor.execute(sql, valores)
+    conec.commit()
+    id_generado = cursor.lastrowid
+
+    cursor.close()
+    conec.close()
+    return {"mensaje": "Curso registrado con éxito", "id": id_generado}, 201
+
+
+# Consultar un curso
+@app.route("/api/cursos/<int:id>", methods=["GET"])
+def obtener_curso(id):
+    conec = conectar_bd()
+    cursor = conec.cursor(buffered=True)
+
+    sql = "SELECT * FROM cursos WHERE id = %s"
+    cursor.execute(sql, (id,))
+    dato = cursor.fetchone()
+
+    if not dato:
+        cursor.close()
+        conec.close()
+        return {"mensaje": "Curso no encontrado"}, 404
+
+    columnas = [col[0] for col in cursor.description]
+    curso = dict(zip(columnas, dato))
+
+    cursor.close()
+    conec.close()
+    return {"curso": curso}, 200
+
+
+# Actualizar un curso
+@app.route("/api/cursos/<int:id>", methods=["PUT"])
+def actualizar_curso(id):
+    conec = conectar_bd()
+    cursor = conec.cursor()
+    datos = request.json
+
+    sql = "UPDATE cursos SET nombre=%s, institucion=%s, duracion_horas=%s WHERE id=%s"
+    valores = (datos["nombre"], datos["institucion"], datos.get("duracion_horas"), id)
+
+    cursor.execute(sql, valores)
+    conec.commit()
+
+    cursor.close()
+    conec.close()
+    return {"mensaje": "Curso actualizado con éxito", "id": id}, 200
+
+
+# Eliminar un curso
+@app.route("/api/cursos/<int:id>", methods=["DELETE"])
+def eliminar_curso(id):
+    conec = conectar_bd()
+    cursor = conec.cursor()
+
+    sql = "DELETE FROM cursos WHERE id = %s"
+    cursor.execute(sql, (id,))
+    conec.commit()
+
+    cursor.close()
+    conec.close()
+    return {"mensaje": "Curso eliminado con éxito", "id": id}, 200
+
+
 if __name__ == "__main__":
     app.run(debug=True)
