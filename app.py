@@ -1,7 +1,9 @@
 from flask import Flask, request
 from database import conectar_bd
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 
 @app.route("/probar")
@@ -42,9 +44,7 @@ def obtener_hojasvida():
 
     return hojas_vida
 
-# ---------------------------------------------------------
-# HOJAS DE VIDA (CRUD)
-# ---------------------------------------------------------
+
 
 @app.route("/api/registrohv", methods=["POST"])
 def registrohvida():
