@@ -1,6 +1,7 @@
 from flask import Flask, request
 from database import conectar_bd
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 CORS(app)
@@ -13,12 +14,95 @@ def probar_data():
         conec.close()
         return {"mensaje": "conexion ok"}
 
+
+@app.route("/")
+def inicio():
+    return "Api hoja de vida funcionando"
+
+@app.route("/api/registro-usuario", methods=["POST"])
+def registro_usuario():
+    datos = request.json or {}
+    
+    nombre = datos.get("nombre", "").strip()
+    correo = datos.get("correo", "").strip()
+    password = datos.get("password", "")
+    hoja_vida_id = datos.get("hoja_vida_id")
+    
+    if not nombre or not correo or not password:
+        return {"error": "Campos vacios"}, 400
+        
+    if not (8 <= len(password) <= 15):
+        return {"error": "Contrasena debe tener entre 8 y 15 caracteres"}, 400
+        
+    conec = conectar_bd()
+    cursor = conec.cursor()
+    
+    cursor.execute("SELECT id FROM usuarios WHERE nombre = %s OR correo = %s", (nombre, correo))
+    if cursor.fetchone():
+        cursor.close()
+        conec.close()
+        return {"error": "Usuario o correo ya registrado"}, 400
+        
+    password_encriptada = generate_password_hash(password)
+    
+    sql = """INSERT INTO usuarios (nombre, correo, password, rol, estado, hoja_vida_id) 
+             VALUES (%s, %s, %s, %s, %s, %s)"""
+    valores = (nombre, correo, password_encriptada, 'aprendiz', 1, hoja_vida_id if hoja_vida_id else None)
+    
+    cursor.execute(sql, valores)
+    conec.commit()
+    
+    cursor.close()
+    conec.close()
+    
+    return {"mensaje": "Usuario registrado exitosamente"}, 201
+
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    datos = request.json or {}
+    
+    credencial = datos.get("usuario_o_correo", "").strip()
+    password = datos.get("password", "")
+    
+    if not credencial or not password:
+        return {"error": "Faltan credenciales"}, 400
+        
+    conec = conectar_bd()
+    cursor = conec.cursor()
+    
+    cursor.execute("SELECT * FROM usuarios WHERE nombre = %s OR correo = %s", (credencial, credencial))
+    datos_usuario = cursor.fetchone()
+    
+    if not datos_usuario:
+        cursor.close()
+        conec.close()
+        return {"error": "Credenciales incorrectas"}, 401
+        
+    columnas = [columna[0] for columna in cursor.description]
+    usuario = dict(zip(columnas, datos_usuario))
+    
+    cursor.close()
+    conec.close()
+    
+    if not check_password_hash(usuario["password"], password):
+        return {"error": "Credenciales incorrectas"}, 401
+        
+    if usuario.get("estado") == 0:
+        return {"error": "Usuario inactivo"}, 403
+        
+    return {
+        "mensaje": "Inicio de sesion exitoso",
+        "id": usuario["id"],
+        "nombre": usuario["nombre"],
+        "rol": usuario["rol"]
+    }, 200
+
 @app.route("/api/hojas-vida")
 def obtener_hojasvida():
+        hojas_vida = [{
 
-    hojas_vida = [
-
-        {
+        
             "id": 1,
             "nombre": "Triple z",
             "edad": 79,
@@ -38,11 +122,9 @@ def obtener_hojasvida():
             "programa": "adso",
             "ficha": 62320,
             "jornada": "diurna"
-        }
+        }]
 
-    ]
-
-    return hojas_vida
+        return hojas_vida
 
 
 
