@@ -1,10 +1,42 @@
 from flask import Flask, request
 from database import conectar_bd
 from flask_cors import CORS
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from database import conectar_bd
+from dotenv import load_dotenv
+import os
+from functools import wraps
+load_dotenv()
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+    get_jwt
+)
+from werkzeug.security import (generate_password_hash,check_password_hash)
 
 app = Flask(__name__)
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+if not app.config["JWT_SECRET_KEY"]:
+    raise RuntimeError("NO SE ENCONTRO LA LLAVE JWT")
+jwt = JWTManager(app)
 CORS(app)
+
+def rol_requerido(rol):
+    def decorador(funcion):
+        @wraps(funcion)
+        @jwt_required()
+        def wrapper(*args,**kwargs):
+            claims = get_jwt()
+
+            if claims.get("rol") != rol:
+                return jsonify({"mensaje":"No tiene permiso para acceder"}),403
+            return funcion(*args,**kwargs)
+        return wrapper
+    return decorador
+
 
 
 @app.route("/probar")
@@ -172,6 +204,7 @@ def registrohvida():
 
 
 @app.route("/api/hojasvida", methods=["GET"])
+@rol_requerido("reclutador")
 def listar_hojasvida():
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
