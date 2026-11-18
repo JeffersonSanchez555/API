@@ -215,7 +215,7 @@ def registrohvida():
 
 
 @app.route("/api/hojasvida", methods=["GET"])
-@rol_requerido("reclutador")
+@rol_requerido("administrador")
 def listar_hojasvida():
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)

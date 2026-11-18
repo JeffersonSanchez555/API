@@ -18,7 +18,7 @@ def crear_administrador():
 
 
     if len(password) < 8 :
-        print("La cocntraseña debe tener minimo 8 caracteres")
+        print("La contraseña debe tener minimo 8 caracteres")
         return
 
     conexion = conectar_bd()
