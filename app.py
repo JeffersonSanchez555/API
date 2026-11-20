@@ -220,20 +220,59 @@ def listar_hojasvida():
     conec = conectar_bd()
     cursor = conec.cursor(buffered=True)
 
-    sql = "SELECT * FROM hojadvida"
-    cursor.execute(sql)
-    datos = cursor.fetchall()
+    try:
+        cursor.execute("SELECT * FROM hojadvida")
+        filas_hv = cursor.fetchall()
+        cols_hv = [col[0] for col in cursor.description]
 
-    columnas = [columna[0] for columna in cursor.description]
-    resultado = [dict(zip(columnas, lista)) for lista in datos]
+        resultado = []
 
-    cursor.close()
-    conec.close()
+        for fila_hv in filas_hv:
+            hv = dict(zip(cols_hv, fila_hv))
+            id_hv = hv["id_hojadvida"]
 
-    return {"hojas_vida": resultado}, 200
+            # 1. Estudios
+            cursor.execute("SELECT * FROM estudios WHERE hojadvida_id = %s", (id_hv,))
+            cols_estudios = [col[0] for col in cursor.description]
+            estudios = [dict(zip(cols_estudios, fila)) for fila in cursor.fetchall()]
+
+            # 2. Cursos
+            cursor.execute("SELECT * FROM cursos WHERE hojadvida_id = %s", (id_hv,))
+            cols_cursos = [col[0] for col in cursor.description]
+            cursos = [dict(zip(cols_cursos, fila)) for fila in cursor.fetchall()]
+
+            # 3. Experiencias + Habilidades
+            cursor.execute("SELECT * FROM experiencias WHERE hojadvida_id = %s", (id_hv,))
+            cols_exp = [col[0] for col in cursor.description]
+            experiencias = [dict(zip(cols_exp, fila)) for fila in cursor.fetchall()]
+
+            for exp in experiencias:
+                cursor.execute("SELECT * FROM habilidades WHERE experiencia_id = %s", (exp["id_exp"],))
+                cols_hab = [col[0] for col in cursor.description]
+                exp["habilidades"] = [dict(zip(cols_hab, fila)) for fila in cursor.fetchall()]
+
+            # Armamos la estructura de cada hoja de vida
+            resultado.append({
+                "datos_personales": hv,
+                "estudios": estudios,
+                "cursos": cursos,
+                "experiencias": experiencias
+            })
+
+        return jsonify({
+            "total": len(resultado),
+            "hojas_vida": resultado
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": "Error al consultar las hojas de vida", "detalle": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conec.close()
 
 
-# --- CONSULTAR MI HOJA DE VIDA (APRENDIZ) ---
+#  CONSULTAR MI HOJA DE VIDA APRENDIZ
 @app.route("/api/mi-hoja-vida", methods=["GET"])
 @jwt_required()
 def mi_hoja_vida():
