@@ -1,13 +1,12 @@
-from flask import Flask, request
-from database import conectar_bd
-from flask_cors import CORS
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from database import conectar_bd
 from dotenv import load_dotenv
 import os
 from functools import wraps
+
 load_dotenv()
+
 from flask_jwt_extended import (
     JWTManager,
     create_access_token,
@@ -15,25 +14,27 @@ from flask_jwt_extended import (
     get_jwt_identity,
     get_jwt
 )
-from werkzeug.security import (generate_password_hash, check_password_hash)
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 if not app.config["JWT_SECRET_KEY"]:
     raise RuntimeError("NO SE ENCONTRO LA LLAVE JWT")
+
 jwt = JWTManager(app)
 CORS(app)
+
 
 def rol_requerido(rol):
     def decorador(funcion):
         @wraps(funcion)
         @jwt_required()
-        def wrapper(*args,**kwargs):
+        def wrapper(*args, **kwargs):
             claims = get_jwt()
 
             if claims.get("rol") != rol:
-                return jsonify({"mensaje":"No tiene permiso para acceder"}), 403
-            return funcion(*args,**kwargs)
+                return jsonify({"mensaje": "No tiene permiso para acceder"}), 403
+            return funcion(*args, **kwargs)
         return wrapper
     return decorador
 
@@ -50,78 +51,79 @@ def probar_data():
 def inicio():
     return "Api hoja de vida funcionando"
 
+
 @app.route("/api/registro-usuario", methods=["POST"])
 def registro_usuario():
     datos = request.json or {}
-    
+
     nombre = datos.get("nombre", "").strip()
     correo = datos.get("correo", "").strip()
     password = datos.get("password", "")
     hoja_vida_id = datos.get("hoja_vida_id")
-    
+
     if not nombre or not correo or not password:
         return {"error": "Campos vacios"}, 400
-        
+
     if not (8 <= len(password) <= 15):
         return {"error": "Contrasena debe tener entre 8 y 15 caracteres"}, 400
-        
+
     conec = conectar_bd()
     cursor = conec.cursor()
-    
+
     cursor.execute("SELECT id FROM usuarios WHERE nombre = %s OR correo = %s", (nombre, correo))
     if cursor.fetchone():
         cursor.close()
         conec.close()
         return {"error": "Usuario o correo ya registrado"}, 400
-        
+
     password_encriptada = generate_password_hash(password)
-    
+
     sql = """INSERT INTO usuarios (nombre, correo, password, rol, estado, hoja_vida_id) 
              VALUES (%s, %s, %s, %s, %s, %s)"""
     valores = (nombre, correo, password_encriptada, 'aprendiz', 1, hoja_vida_id if hoja_vida_id else None)
-    
+
     cursor.execute(sql, valores)
     conec.commit()
-    
+
     cursor.close()
     conec.close()
-    
+
     return {"mensaje": "Usuario registrado exitosamente"}, 201
 
 
 @app.route("/api/login", methods=["POST"])
 def login():
     datos = request.json or {}
-    
+
     credencial = datos.get("usuario_o_correo", "").strip() or datos.get("correo", "").strip().lower()
     password = datos.get("password", "")
-    
+
     if not credencial or not password:
         return {"error": "Faltan credenciales"}, 400
-        
+
     conec = conectar_bd()
     cursor = conec.cursor()
-    
+
     cursor.execute("SELECT * FROM usuarios WHERE nombre = %s OR correo = %s", (credencial, credencial))
     datos_usuario = cursor.fetchone()
-    
+
     if not datos_usuario:
         cursor.close()
         conec.close()
         return {"error": "Credenciales incorrectas"}, 401
-        
+
     columnas = [columna[0] for columna in cursor.description]
     usuario = dict(zip(columnas, datos_usuario))
-    
+
     cursor.close()
     conec.close()
-    
+
     if not check_password_hash(usuario["password"], password):
         return {"error": "Credenciales incorrectas"}, 401
-        
+
     if usuario.get("estado") == 0:
         return {"error": "Usuario inactivo"}, 403
-        
+
     token = create_access_token(
         identity=str(usuario["id"]),
         additional_claims={"rol": usuario["rol"]}
@@ -138,9 +140,11 @@ def login():
         }
     }, 200
 
+
 @app.route("/api/hojas-vida")
 def obtener_hojasvida():
-        hojas_vida = [{
+    hojas_vida = [
+        {
             "id": 1,
             "nombre": "Triple z",
             "edad": 79,
@@ -159,8 +163,9 @@ def obtener_hojasvida():
             "programa": "adso",
             "ficha": 62320,
             "jornada": "diurna"
-        }]
-        return hojas_vida
+        }
+    ]
+    return hojas_vida
 
 
 @app.route("/api/registrohv", methods=["POST"])
@@ -168,7 +173,7 @@ def obtener_hojasvida():
 def registrohvida():
     usuario_id = int(get_jwt_identity())
     claims = get_jwt()
-    
+
     if claims.get("rol") != "aprendiz":
         return jsonify({"mensaje": "Solo los aprendices pueden registrar HV"}), 403
 
@@ -191,7 +196,7 @@ def registrohvida():
 
     sql = """INSERT INTO hojadvida(usuario_id, nombre, edad, ciudad, correo, fotografia, programa, ficha, jornada) 
              VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-    
+
     valor = (
         usuario_id,
         datos.get("nombre"),
@@ -203,7 +208,7 @@ def registrohvida():
         datos.get("ficha"),
         datos.get("jornada")
     )
-    
+
     cursor.execute(sql, valor)
     conec.commit()
     id_generado = cursor.lastrowid
@@ -251,7 +256,6 @@ def listar_hojasvida():
                 cols_hab = [col[0] for col in cursor.description]
                 exp["habilidades"] = [dict(zip(cols_hab, fila)) for fila in cursor.fetchall()]
 
-            # Armamos la estructura de cada hoja de vida
             resultado.append({
                 "datos_personales": hv,
                 "estudios": estudios,
@@ -272,7 +276,7 @@ def listar_hojasvida():
         conec.close()
 
 
-#  CONSULTAR MI HOJA DE VIDA APRENDIZ
+# CONSULTAR MI HOJA DE VIDA APRENDIZ
 @app.route("/api/mi-hoja-vida", methods=["GET"])
 @jwt_required()
 def mi_hoja_vida():
@@ -370,7 +374,7 @@ def actualizar_hoja_vida(id):
     sql_update = """UPDATE hojadvida 
                     SET nombre=%s, edad=%s, ciudad=%s, correo=%s, fotografia=%s, programa=%s, ficha=%s, jornada=%s 
                     WHERE id_hojadvida=%s"""
-    
+
     valores = (
         datos.get("nombre"),
         datos.get("edad"),
@@ -393,30 +397,37 @@ def actualizar_hoja_vida(id):
 
 
 @app.route("/api/eliminarhv/<int:id>", methods=["DELETE"])
+@jwt_required()
 def eliminar_hoja_vida(id):
+    usuario_id = int(get_jwt_identity())
+    claims = get_jwt()
+
+    if claims.get("rol") != "aprendiz":
+        return jsonify({"mensaje": "Solo los aprendices pueden eliminar su hoja de vida"}), 403
+
     conec = conectar_bd()
     cursor = conec.cursor()
 
-    sql_consulta = "SELECT id_hojadvida FROM hojadvida WHERE id_hojadvida = %s"
-    cursor.execute(sql_consulta, (id,))
+    sql_consulta = "SELECT id_hojadvida FROM hojadvida WHERE id_hojadvida = %s AND usuario_id = %s"
+    cursor.execute(sql_consulta, (id, usuario_id))
     hoja_vida = cursor.fetchone()
 
     if not hoja_vida:
         cursor.close()
         conec.close()
-        return {"mensaje": "La hoja de vida no existe", "id_hojadvida": id}, 404
+        return jsonify({"mensaje": "Hoja de vida no encontrada o no autorizada"}), 404
 
-    sql = "DELETE FROM hojadvida WHERE id_hojadvida = %s"
-    cursor.execute(sql, (id,))
+    sql = "DELETE FROM hojadvida WHERE id_hojadvida = %s AND usuario_id = %s"
+    cursor.execute(sql, (id, usuario_id))
     conec.commit()
 
     cursor.close()
     conec.close()
 
-    return {"mensaje": "Hoja de vida eliminada correctamente", "id_hojadvida": id}, 200
+    return jsonify({"mensaje": "Hoja de vida eliminada correctamente", "id_hojadvida": id}), 200
 
 
-# ESTUDIOS 
+# ESTUDIOS
 
 @app.route("/api/hojas-vida/<int:id_hv>/estudios", methods=["GET"])
 def obtener_estudios_hv(id_hv):
@@ -449,7 +460,7 @@ def registrar_estudio(id_hv):
         datos.get("titulo"),
         datos.get("graduacion")
     )
-    
+
     cursor.execute(sql, valores)
     conec.commit()
     id_generado = cursor.lastrowid
@@ -518,7 +529,7 @@ def eliminar_estudio(id):
     return {"mensaje": "Estudio eliminado con éxito", "id_estu": id}, 200
 
 
-# EXPERIENCIAS 
+# EXPERIENCIAS
 
 @app.route("/api/hojas-vida/<int:id_hv>/experiencias", methods=["GET"])
 def obtener_experiencias_hv(id_hv):
@@ -620,7 +631,7 @@ def eliminar_experiencia(id):
     return {"mensaje": "Experiencia eliminada con éxito", "id_exp": id}, 200
 
 
-# HABILIDADES 
+# HABILIDADES
 
 @app.route("/api/experiencias/<int:id_exp>/habilidades", methods=["GET"])
 def obtener_habilidades_exp(id_exp):
@@ -644,7 +655,7 @@ def obtener_habilidades_exp(id_exp):
 def registrar_habilidad(id_exp):
     usuario_id = int(get_jwt_identity())
     datos = request.json or {}
-    
+
     if get_jwt().get("rol") != "aprendiz":
         return jsonify({"mensaje": "No tienes permiso"}), 403
 
@@ -657,7 +668,7 @@ def registrar_habilidad(id_exp):
         INNER JOIN hojadvida hv ON hv.id_hojadvida = e.hojadvida_id
         WHERE e.id_exp = %s AND hv.usuario_id = %s
     """, (id_exp, usuario_id))
-    
+
     if not cursor.fetchone():
         cursor.close()
         conec.close()
@@ -706,7 +717,7 @@ def eliminar_habilidad(id):
     return {"mensaje": "Habilidad eliminada con éxito", "id_habili": id}, 200
 
 
-# CURSOS 
+# CURSOS
 
 @app.route("/api/hojas-vida/<int:id_hv>/cursos", methods=["GET"])
 def obtener_cursos_hv(id_hv):
